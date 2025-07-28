@@ -5,6 +5,9 @@ This repository contains the distribution package for Spring MCP (Model Context 
 ## Project Structure
 
 ```
+├── .github/
+│   └── workflows/
+│       └── publish.yml     # GitHub Actions workflow for automated publishing
 ├── releases/
 │   ├── releaseLog
 │   └── 0_0_1/
@@ -25,7 +28,25 @@ This repository contains the distribution package for Spring MCP (Model Context 
 
 ## Publishing
 
-### Prerequisites
+### Automated Publishing (Recommended)
+
+The repository includes a GitHub Actions workflow that automatically publishes to GitHub Packages when:
+- 📝 Changes are pushed to the `main` branch (affecting `releases/` or `pom.xml`)
+- 🏷️ A new release is published
+- 🔄 Manually triggered via GitHub Actions tab
+
+**Workflow Features:**
+- ✅ Validates JAR file exists
+- 📊 Reports file size and deployment details
+- 🎯 Automatic authentication using GitHub tokens
+- 📋 Creates deployment summary
+- ❌ Failure notifications
+
+### Manual Publishing
+
+If you need to publish manually:
+
+#### Prerequisites
 
 Before publishing to GitHub Packages, ensure you have configured GitHub authentication in your `~/.m2/settings.xml`:
 
@@ -41,7 +62,7 @@ Before publishing to GitHub Packages, ensure you have configured GitHub authenti
 </settings>
 ```
 
-### Publish to GitHub Packages
+#### Manual Publish Scripts
 
 **On Unix/Linux/macOS:**
 ```bash

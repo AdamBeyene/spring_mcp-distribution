@@ -1,0 +1,95 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'releases/**'
+      - 'pom.xml'
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Configure Maven settings
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        server-id: github
+        server-username: GITHUB_ACTOR
+        server-password: GITHUB_TOKEN
+
+    - name: Validate JAR file exists
+      run: |
+        if [ ! -f "releases/0_0_1/Spring_MCP.jar" ]; then
+          echo "❌ Error: JAR file not found at releases/0_0_1/Spring_MCP.jar"
+          exit 1
+        fi
+        echo "✅ JAR file found: releases/0_0_1/Spring_MCP.jar"
+
+    - name: Get JAR file info
+      id: jar-info
+      run: |
+        JAR_SIZE=$(stat -c%s "releases/0_0_1/Spring_MCP.jar")
+        JAR_SIZE_MB=$(echo "scale=2; $JAR_SIZE / 1024 / 1024" | bc)
+        echo "jar-size=$JAR_SIZE_MB MB" >> $GITHUB_OUTPUT
+
+    - name: Publish to GitHub Packages
+      run: |
+        echo "📦 Publishing Spring MCP Distribution to GitHub Packages..."
+        echo "  Group ID: com.ab_tools"
+        echo "  Artifact ID: spring-mcp-starter-dist"
+        echo "  Version: 0.0.1"
+        echo "  File: releases/0_0_1/Spring_MCP.jar"
+        echo "  Size: ${{ steps.jar-info.outputs.jar-size }}"
+        echo ""
+        
+        mvn deploy:deploy-file \
+          -DgroupId=com.ab_tools \
+          -DartifactId=spring-mcp-starter-dist \
+          -Dversion=0.0.1 \
+          -Dpackaging=jar \
+          -Dfile=releases/0_0_1/Spring_MCP.jar \
+          -DrepositoryId=github \
+          -Durl=https://maven.pkg.github.com/${{ github.repository }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create deployment summary
+      if: success()
+      run: |
+        echo "## 🎉 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Package Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Group ID**: com.ab_tools" >> $GITHUB_STEP_SUMMARY
+        echo "- **Artifact ID**: spring-mcp-starter-dist" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: 0.0.1" >> $GITHUB_STEP_SUMMARY
+        echo "- **File Size**: ${{ steps.jar-info.outputs.jar-size }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [📦 View Package](https://github.com/${{ github.repository }}/packages)" >> $GITHUB_STEP_SUMMARY
+        echo "- [📋 Repository](https://github.com/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify failure
+      if: failure()
+      run: |
+        echo "## ❌ Deployment Failed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "The package deployment to GitHub Packages failed. Please check the logs above for details." >> $GITHUB_STEP_SUMMARY
