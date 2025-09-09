@@ -56,33 +56,19 @@ jobs:
           mkdir -p "$SITE_ROOT"
           touch "docs/.nojekyll"
 
-          # Clean previously published (incorrect) version folder to avoid stale POMs
-          rm -rf "$SITE_ROOT/com/ab_tools/spring-mcp-starter-dist/${{ steps.rel.outputs.version }}"
+          VERSION="${{ steps.rel.outputs.version }}"
 
-          # Create a minimal POM with correct coordinates
-          TMP_POM="$(mktemp)"
-          cat > "$TMP_POM" <<'POM'
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.ab_tools</groupId>
-  <artifactId>spring-mcp-starter-dist</artifactId>
-  <version>${version}</version>
-  <packaging>jar</packaging>
-  <name>spring-mcp-starter-dist</name>
-  <description>Static Maven repo artifact for Spring MCP starter distribution</description>
-</project>
-POM
+          # Clean previously published version to avoid stale files
+          rm -rf "$SITE_ROOT/com/ab_tools/spring-mcp-starter-dist/$VERSION"
 
-          # Replace ${version} placeholder with the computed version
-          sed -i "s|\${version}|${{ steps.rel.outputs.version }}|g" "$TMP_POM"
-
-          # Deploy using the explicit POM to guarantee GAV correctness
+          # Deploy using generated POM to guarantee GAV correctness
           mvn -B deploy:deploy-file \
-            -DpomFile="$TMP_POM" \
+            -DgroupId=com.ab_tools \
+            -DartifactId=spring-mcp-starter-dist \
+            -Dversion="$VERSION" \
+            -Dpackaging=jar \
             -Dfile="${{ steps.rel.outputs.jar_path }}" \
+            -DgeneratePom=true \
             -DrepositoryLayout=default \
             -Durl="file://$GITHUB_WORKSPACE/${SITE_ROOT}"
 
@@ -92,5 +78,5 @@ POM
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/maven docs/.nojekyll
-          git commit -m "Publish ${{ steps.rel.outputs.version }} to static Maven repo (docs/maven) with corrected GAV" || echo "No changes to commit"
+          git commit -m "Publish ${{ steps.rel.outputs.version }} to static Maven repo (docs/maven) with generated POM" || echo "No changes to commit"
           git push
