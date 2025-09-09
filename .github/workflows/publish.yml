@@ -8,7 +8,7 @@ on:
       - 'pom.xml'
   release:
     types: [published]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -36,18 +36,59 @@ jobs:
         server-username: GITHUB_ACTOR
         server-password: GITHUB_TOKEN
 
-    - name: Validate JAR file exists
+    - name: Determine release directory, JAR and version
+      id: rel
       run: |
-        if [ ! -f "releases/0_0_1/Spring_MCP.jar" ]; then
-          echo "❌ Error: JAR file not found at releases/0_0_1/Spring_MCP.jar"
+        set -e
+        # Most recent release directory (by mtime)
+        REL_DIR="$(ls -td releases/*/ 2>/dev/null | head -1 | sed 's:/*$::')"
+        if [ -z "$REL_DIR" ]; then
+          echo "❌ No release directory found under releases/"
           exit 1
         fi
-        echo "✅ JAR file found: releases/0_0_1/Spring_MCP.jar"
+        FOLDER_TS="$(basename "$REL_DIR")"
+
+        # JAR path (first jar in that folder)
+        JAR_PATH="$(ls "$REL_DIR"/*.jar 2>/dev/null | head -1 || true)"
+        if [ ! -f "$JAR_PATH" ]; then
+          echo "❌ No JAR found under $REL_DIR"
+          exit 1
+        fi
+
+        # Version selection: prefer release_version.txt, otherwise compose pom_version + "_" + folder timestamp
+        if [ -f "$REL_DIR/release_version.txt" ]; then
+          VERSION="$(tr -d ' \r\n' < "$REL_DIR/release_version.txt")"
+        else
+          if [ -f "$REL_DIR/pom_version.txt" ]; then
+            POM_VERSION="$(tr -d ' \r\n' < "$REL_DIR/pom_version.txt")"
+          else
+            POM_VERSION="0.0.0"
+          fi
+          VERSION="${POM_VERSION}_${FOLDER_TS}"
+        fi
+
+        echo "Release directory: $REL_DIR"
+        echo "Folder timestamp:  $FOLDER_TS"
+        echo "JAR:               $JAR_PATH"
+        echo "Version to publish: $VERSION"
+
+        echo "rel_dir=$REL_DIR" >> $GITHUB_OUTPUT
+        echo "folder_ts=$FOLDER_TS" >> $GITHUB_OUTPUT
+        echo "jar_path=$JAR_PATH" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Validate JAR file exists
+      run: |
+        if [ ! -f "${{ steps.rel.outputs.jar_path }}" ]; then
+          echo "❌ Error: JAR file not found at ${{ steps.rel.outputs.jar_path }}"
+          exit 1
+        fi
+        echo "✅ JAR file found: ${{ steps.rel.outputs.jar_path }}"
 
     - name: Get JAR file info
       id: jar-info
       run: |
-        JAR_SIZE=$(stat -c%s "releases/0_0_1/Spring_MCP.jar")
+        JAR_SIZE=$(stat -c%s "${{ steps.rel.outputs.jar_path }}")
         JAR_SIZE_MB=$(echo "scale=2; $JAR_SIZE / 1024 / 1024" | bc)
         echo "jar-size=$JAR_SIZE_MB MB" >> $GITHUB_OUTPUT
 
@@ -56,17 +97,17 @@ jobs:
         echo "📦 Publishing Spring MCP Distribution to GitHub Packages..."
         echo "  Group ID: com.ab_tools"
         echo "  Artifact ID: spring-mcp-starter-dist"
-        echo "  Version: 0.0.1"
-        echo "  File: releases/0_0_1/Spring_MCP.jar"
+        echo "  Version: ${{ steps.rel.outputs.version }}"
+        echo "  File: ${{ steps.rel.outputs.jar_path }}"
         echo "  Size: ${{ steps.jar-info.outputs.jar-size }}"
         echo ""
         
         mvn deploy:deploy-file \
           -DgroupId=com.ab_tools \
           -DartifactId=spring-mcp-starter-dist \
-          -Dversion=0.0.1 \
+          -Dversion=${{ steps.rel.outputs.version }} \
           -Dpackaging=jar \
-          -Dfile=releases/0_0_1/Spring_MCP.jar \
+          -Dfile=${{ steps.rel.outputs.jar_path }} \
           -DrepositoryId=github \
           -Durl=https://maven.pkg.github.com/${{ github.repository }}
       env:
@@ -80,7 +121,7 @@ jobs:
         echo "### 📦 Package Details" >> $GITHUB_STEP_SUMMARY
         echo "- **Group ID**: com.ab_tools" >> $GITHUB_STEP_SUMMARY
         echo "- **Artifact ID**: spring-mcp-starter-dist" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: 0.0.1" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.rel.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "- **File Size**: ${{ steps.jar-info.outputs.jar-size }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
