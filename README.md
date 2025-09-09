@@ -94,6 +94,8 @@ mvn deploy:deploy-file \
 
 ## Usage
 
+### Use from GitHub Packages (requires auth)
+
 After deployment, you can include this package in your Maven projects:
 
 ```xml
@@ -114,3 +116,40 @@ Don't forget to add the GitHub Packages repository to your `pom.xml`:
   </repository>
 </repositories>
 ```
+
+### Use from GitHub Pages (no auth)
+
+For anonymous access without GitHub authentication, you can consume the artifact from our static Maven repository hosted on GitHub Pages:
+
+**Maven:**
+```xml
+<repositories>
+  <repository>
+    <id>github-pages</id>
+    <url>https://adambeyene.github.io/spring_mcp-distribution/maven</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>com.ab_tools</groupId>
+    <artifactId>spring-mcp-starter-dist</artifactId>
+    <version>1.0.1_2025_09_09_15_05</version>
+  </dependency>
+</dependencies>
+```
+
+**Gradle:**
+```groovy
+repositories {
+    maven {
+        url 'https://adambeyene.github.io/spring_mcp-distribution/maven'
+    }
+}
+
+dependencies {
+    implementation 'com.ab_tools:spring-mcp-starter-dist:1.0.1_2025_09_09_15_05'
+}
+```
+
+**Note:** Replace `1.0.1_2025_09_09_15_05` with the latest version available. The version format follows the pattern: `{pom_version}_{YYYY_MM_DD_HH_MM}` based on the release timestamp.
