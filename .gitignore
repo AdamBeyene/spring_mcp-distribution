@@ -16,6 +16,7 @@ build/
 *.class
 *.jar
 !releases/**/*.jar
+!docs/maven/**
 
 # Logs
 *.log
